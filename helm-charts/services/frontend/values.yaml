@@ -1,0 +1,84 @@
+# Frontend Service Configuration
+
+replicaCount: 3
+
+image:
+  repository: voting-app-frontend
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"  # Overridden by CI/CD
+
+containerPort: 3000
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+# Resource requests and limits
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  failureThreshold: 3
+
+# Pod annotations for monitoring
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "3000"
+  prometheus.io/path: "/metrics"
+
+# Environment variables
+configMap:
+  data:
+    REACT_APP_API_URL: "https://api.voting-app.example.com"
+    REACT_APP_ENVIRONMENT: "production"
+    PUBLIC_URL: "/"
+
+# Node selection
+nodeSelector: {}
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - frontend
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Service Account
+serviceAccount:
+  create: true
+  name: voting-app-frontend
+
+# Ingress configuration (handled by main Ingress in ingress-controller)
+ingress:
+  enabled: false

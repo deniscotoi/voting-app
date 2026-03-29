@@ -1,0 +1,120 @@
+# Grafana Helm Chart Values
+# Upstream: grafana/grafana
+
+replicas: 1
+
+image:
+  repository: grafana/grafana
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 3000
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    cpu: 200m
+    memory: 512Mi
+
+# Admin credentials
+adminUser: admin
+adminPassword: prom-operator  # Change in production!
+
+# Data persistence
+persistence:
+  enabled: true
+  storageClassName: default
+  size: 10Gi
+
+# Data sources
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-kube-prometheus-prometheus.monitoring.svc:9090
+        access: proxy
+        isDefault: true
+        editable: true
+
+# Dashboard provisioning
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: 'voting-app'
+        orgId: 1
+        folder: 'Voting App'
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards/voting-app
+
+# Pre-loaded dashboards (mounted from ConfigMaps)
+dashboards:
+  voting-app:
+    application.json: {}
+    api-gateway.json: {}
+    database.json: {}
+    availability.json: {}
+    blackbox.json: {}
+
+# Grafana plugins
+plugins:
+  - grafana-piechart-panel
+  - grafana-worldmap-panel
+
+# Notification channels
+notifiers:
+  notifiers.yaml:
+    notifiers:
+      # Example: Slack notification
+      - name: Slack
+        type: slack
+        settings:
+          url: "${SLACK_WEBHOOK_URL}"  # Set via environment variable
+        isDefault: false
+
+# RBAC
+rbac:
+  enabled: true
+  create: true
+
+# Service Account
+serviceAccount:
+  create: true
+  name: grafana
+
+# Security Context
+securityContext:
+  runAsUser: 472
+  runAsGroup: 472
+  fsGroup: 472
+
+# Environment variables
+env:
+  GF_SECURITY_ADMIN_PASSWORD: "prom-operator"  # Change in production!
+  GF_USERS_ALLOW_SIGN_UP: "false"
+  GF_USERS_AUTO_ASSIGN_ORG_ROLE: "Viewer"
+
+# Ingress (optional)
+ingress:
+  enabled: false
+  ingressClassName: nginx
+  path: /grafana
+  hosts:
+    - api.voting-app.example.com
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  tls:
+    - secretName: grafana-tls
+      hosts:
+        - api.voting-app.example.com

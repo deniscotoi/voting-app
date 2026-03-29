@@ -1,0 +1,186 @@
+# OpenTelemetry Collector Helm Chart Values
+# Upstream: open-telemetry/opentelemetry-collector
+
+mode: daemonset  # or deployment
+
+# Image configuration
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Replica count (for deployment mode)
+replicaCount: 1
+
+# Resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+
+# Service configuration
+service:
+  enabled: true
+  type: ClusterIP
+  
+  ports:
+    # gRPC receiver
+    otlp:
+      enabled: true
+      containerPort: 4317
+      protocol: TCP
+      
+    # HTTP receiver
+    otlp-http:
+      enabled: true
+      containerPort: 4318
+      protocol: TCP
+    
+    # Prometheus receiver
+    prometheus:
+      enabled: true
+      containerPort: 8888
+      protocol: TCP
+    
+    # Metrics endpoint
+    metrics:
+      enabled: true
+      containerPort: 8888
+      protocol: TCP
+
+# Pod annotations for monitoring
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8888"
+  prometheus.io/path: "/metrics"
+
+# Config for OpenTelemetry Collector
+config:
+  receivers:
+    # OTLP gRPC receiver
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+    # Prometheus receiver (scrape Prometheus endpoints)
+    prometheus:
+      config:
+        scrape_configs:
+          - job_name: 'otel-collector'
+            static_configs:
+              - targets: ['localhost:8888']
+
+    # Host metrics (if running as daemonset)
+    hostmetrics:
+      collection_interval: 1m
+      scrapers:
+        - cpu
+        - disk
+        - load
+        - memory
+        - network
+        - processes
+
+  processors:
+    # Batch processor for efficiency
+    batch:
+      send_batch_size: 10000
+      timeout: 10s
+
+    # Memory limiter to prevent OOM
+    memory_limiter:
+      check_interval: 1s
+      limit_percentage: 80
+      spike_limit_percentage: 25
+
+    # Resource detection for cloud metadata
+    resourcedetection:
+      detectors: [gce, ecs, ec2, system, docker, kubernetes]
+      timeout: 2s
+      override: false
+
+  exporters:
+    # Export metrics to Prometheus remote write
+    prometheusremotewrite:
+      endpoint: "http://prometheus-kube-prometheus-prometheus.monitoring.svc:9090/api/v1/write"
+      tls:
+        insecure: true
+
+    # Export traces to Jaeger (optional)
+    jaeger:
+      endpoint: "jaeger-collector.monitoring.svc:14250"
+      tls:
+        insecure: true
+
+    # Export logs to Loki (optional)
+    loki:
+      endpoint: "http://loki.monitoring.svc:3100/loki/api/v1/push"
+
+    # OTEL (for testing)
+    logging:
+      loglevel: debug
+
+  extensions:
+    health_check:
+      endpoint: 0.0.0.0:13133
+
+  service:
+    extensions: [health_check]
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, batch, resourcedetection]
+        exporters: [jaeger, logging]
+      
+      metrics:
+        receivers: [otlp, prometheus, hostmetrics]
+        processors: [memory_limiter, batch, resourcedetection]
+        exporters: [prometheusremotewrite, logging]
+      
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, batch, resourcedetection]
+        exporters: [loki, logging]
+
+# Environment variables
+env:
+  - name: GOGC
+    value: "80"
+  - name: NODE_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: spec.nodeName
+
+# Security context
+securityContext:
+  runAsUser: 0
+  runAsGroup: 0
+
+# Service account
+serviceAccount:
+  create: true
+  name: otel-collector
+
+# RBAC
+rbac:
+  create: true
+
+# Network policies
+networkPolicy:
+  enabled: false
+
+# Pod security policy
+podSecurityPolicy:
+  enabled: false
+
+# Persistence (optional)
+persistence:
+  enabled: false
+  storageClassName: default
+  size: 10Gi

@@ -1,0 +1,1 @@
+{"Modules":[{"Key":"","Source":"","Dir":"."},{"Key":"acr","Source":"./modules/acr","Dir":"modules/acr"},{"Key":"aks","Source":"./modules/aks_cluster","Dir":"modules/aks_cluster"},{"Key":"db","Source":"./modules/db","Dir":"modules/db"},{"Key":"networking","Source":"./modules/networking","Dir":"modules/networking"}]}

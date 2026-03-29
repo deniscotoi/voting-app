@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-headers
+  namespace: ingress-nginx
+data:
+  # Security headers
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+  
+  # CORS headers (adjust origins as needed)
+  Access-Control-Allow-Origin: "*"
+  Access-Control-Allow-Methods: "GET, POST, PUT, DELETE, OPTIONS"
+  Access-Control-Allow-Headers: "Content-Type, Authorization"
+  
+  # Server identification (hides NGINX version)
+  Server: "Voting App API"

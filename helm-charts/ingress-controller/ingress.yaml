@@ -1,0 +1,105 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: voting-app
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Enable CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    # Rate limiting per IP
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    # Enable metrics
+    nginx.ingress.kubernetes.io/metrics: "true"
+    # TLS certificate (optional, see cert-manager setup)
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+spec:
+  ingressClassName: nginx
+  
+  # TLS/SSL configuration
+  tls:
+    - hosts:
+        - api.voting-app.example.com
+        - voting-app.example.com
+      secretName: voting-app-tls
+
+  rules:
+    # API Routes
+    - host: api.voting-app.example.com
+      http:
+        paths:
+          - path: /api/v1/vote
+            pathType: Prefix
+            backend:
+              service:
+                name: voting-app-api
+                port:
+                  number: 8080
+          
+          - path: /api/v1/results
+            pathType: Prefix
+            backend:
+              service:
+                name: voting-app-api
+                port:
+                  number: 8080
+          
+          - path: /api/v1/health
+            pathType: Prefix
+            backend:
+              service:
+                name: voting-app-api
+                port:
+                  number: 8080
+          
+          - path: /api/v1/ready
+            pathType: Prefix
+            backend:
+              service:
+                name: voting-app-api
+                port:
+                  number: 8080
+          
+          # Metrics endpoint for monitoring
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: voting-app-api
+                port:
+                  number: 8080
+
+    # Frontend Routes
+    - host: voting-app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: voting-app-frontend
+                port:
+                  number: 80
+          
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: voting-app-api
+                port:
+                  number: 8080
+
+    # Worker health endpoint (internal only)
+    - host: internal.voting-app.example.com
+      http:
+        paths:
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: voting-app-worker
+                port:
+                  number: 8080

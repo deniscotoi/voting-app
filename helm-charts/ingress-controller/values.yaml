@@ -1,0 +1,149 @@
+# NGINX Ingress Controller Helm Chart Values
+# Upstream: nginx-stable/nginx-ingress
+
+controller:
+  kind: Deployment
+  replicaCount: 2
+  
+  image:
+    repository: nginx/nginx-ingress
+    tag: "3.0.0"
+    pullPolicy: IfNotPresent
+
+  # Service configuration
+  service:
+    type: LoadBalancer
+    externalTrafficPolicy: Local
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-internal: "false"
+    
+    # Expose on standard ports
+    httpPort:
+      enable: true
+      port: 80
+      targetPort: 80
+    
+    httpsPort:
+      enable: true
+      port: 443
+      targetPort: 443
+
+  # Resources
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Health check
+  healthStatus: true
+  healthStatusURI: "/nginx_health"
+
+  # Pod annotations for monitoring
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+
+  # Logging
+  logging:
+    level: info
+    
+  # DaemonSet (alternative to Deployment for every-node exposure)
+  daemonset:
+    enabled: false
+
+  # Metrics
+  metrics:
+    enabled: true
+    port: 8080
+    service:
+      create: true
+      type: ClusterIP
+      port: 8080
+
+  # Enable default backend
+  defaultBackend:
+    enabled: false
+
+  # SSL/TLS configuration
+  nginx:
+    serverTokens: "off"
+    sslProtocols: "TLSv1.2 TLSv1.3"
+    sslCiphers: "HIGH:!aNULL:!MD5"
+    sslPreferServerCiphers: "on"
+    
+    # Enable HSTS
+    hsts: true
+    hstsMaxAge: 31536000
+    hstsIncludeSubdomains: true
+    hstsPreload: true
+
+  # RBAC
+  rbac:
+    create: true
+
+  # Service account
+  serviceAccount:
+    create: true
+    name: nginx-ingress
+
+  # Network policies (optional)
+  networkPolicy:
+    enabled: false
+
+# Controller configuration
+controllerConfig:
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: nginx-config
+    namespace: ingress-nginx
+  data:
+    # Security headers
+    add-headers: "ingress-nginx/custom-headers"
+    
+    # Rate limiting
+    limit-rps: "100"
+    limit-connections: "10"
+    
+    # Buffer sizing
+    client-header-buffer-size: "128k"
+    client-body-buffer-size: "128k"
+    large-client-header-buffers: "4 128k"
+    
+    # Timeout settings
+    client-body-timeout: "30s"
+    client-header-timeout: "30s"
+    keepalive-timeout: "30s"
+    
+    # Proxy settings
+    proxy-connect-timeout: "30s"
+    proxy-read-timeout: "30s"
+    proxy-send-timeout: "30s"
+    proxy-buffer-size: "32k"
+    proxy-buffers: "32 32k"
+    
+    # Compression
+    enable-gzip: "true"
+    gzip-level: "6"
+    gzip-types: "text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss"
+
+# Global RBAC
+rbac:
+  create: true
+
+# Prometheus ServiceMonitor (for metrics scraping)
+prometheus:
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+    interval: 30s
+    scrapeTimeout: 10s
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

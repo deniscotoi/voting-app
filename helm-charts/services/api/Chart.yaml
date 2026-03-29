@@ -1,0 +1,24 @@
+apiVersion: v2
+name: api
+description: API service for voting application
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+dependencies:
+  - name: common-lib
+    version: 1.0.0
+    repository: file://../common-lib
+
+keywords:
+  - voting-app
+  - api
+  - backend
+
+home: https://github.com/voting-app/helm-charts
+sources:
+  - https://github.com/voting-app
+
+maintainers:
+  - name: Admin
+    email: admin@voting-app.example.com

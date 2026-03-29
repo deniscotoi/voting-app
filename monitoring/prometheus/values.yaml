@@ -1,0 +1,115 @@
+# Prometheus Helm Chart Values
+# Upstream: prometheus-community/kube-prometheus-stack
+
+# This installs the complete kube-prometheus-stack including:
+# - Prometheus Operator
+# - Prometheus Server
+# - AlertManager
+# - Grafana (optional)
+# - Node Exporter
+# - Kube State Metrics
+
+prometheus-operator:
+  enabled: true
+  manageCrds: true
+
+prometheus:
+  enabled: true
+  
+  prometheusSpec:
+    # Resources
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 2Gi
+    
+    # Data retention
+    retention: 15d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+    
+    # Scrape configuration
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    
+    # Service monitors to scrape
+    serviceMonitorSelector: {}
+    podMonitorSelector: {}
+    
+    # External labels for Prometheus
+    externalLabels:
+      cluster: "voting-app"
+      environment: "production"
+
+alertmanager:
+  enabled: true
+  
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+# Node Exporter for infrastructure metrics
+nodeExporter:
+  enabled: true
+
+# Kube State Metrics for Kubernetes cluster metrics
+kubeStateMetrics:
+  enabled: true
+
+# Grafana (can be installed separately)
+grafana:
+  enabled: false  # Install separately for better control
+
+# Prometheus Operator
+prometheusOperator:
+  enabled: true
+  manageCrds: true
+
+# Service monitors for built-in Kubernetes components
+kubeApiServer:
+  enabled: true
+
+kubelet:
+  enabled: true
+  namespace: kube-system
+
+kubeControllerManager:
+  enabled: false  # Usually disabled in managed clusters (AKS)
+
+coreDns:
+  enabled: true
+
+kubeEtcd:
+  enabled: false  # Usually disabled in managed clusters
+
+kubeScheduler:
+  enabled: false  # Usually disabled in managed clusters
+
+kubeProxy:
+  enabled: false  # Usually disabled in managed clusters
+
+# Global service monitor selector
+serviceMonitorsSelector: {}
+
+# Priority class for critical monitoring pods
+priorityClassName: "system-cluster-critical"
+
+# Service type
+service:
+  type: ClusterIP
+  port: 9090
+  targetPort: 9090
+  # For external access, change to LoadBalancer or use ingress

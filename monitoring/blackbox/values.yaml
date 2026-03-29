@@ -1,0 +1,108 @@
+# Blackbox Exporter Helm Chart Values
+# For external black-box (availability) monitoring
+
+image:
+  repository: prom/blackbox-exporter
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 9115
+  targetPort: 9115
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+# Pod annotations for Prometheus scraping
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9115"
+
+# Blackbox configuration
+# Defines probe modules (http, tcp, icmp, dns, grpc)
+config: |
+  modules:
+    http_2xx:
+      prober: http
+      timeout: 5s
+      http:
+        valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+        valid_status_codes: []  # Accepts any 2xx code
+        method: GET
+        no_follow_redirects: false
+        prefer_ipv4: false
+        tls_config:
+          insecure_skip_verify: false
+        follow_redirects: true
+        fail_if_ssl: false
+        fail_if_not_ssl: false
+
+    http_post_2xx:
+      prober: http
+      timeout: 5s
+      http:
+        method: POST
+        headers:
+          Content-Type: application/json
+        body: '{"key": "value"}'
+
+    tcp_connect:
+      prober: tcp
+      timeout: 5s
+
+    dns_lookup:
+      prober: dns
+      timeout: 5s
+      dns:
+        transport_protocol: "tcp"
+        preferred_ip_protocol: "ip4"
+        query_name: "example.com"
+
+    grpc_plain:
+      prober: grpc
+      timeout: 5s
+      grpc:
+        tls: false
+        service: ""
+
+    icmp:
+      prober: icmp
+      timeout: 5s
+      icmp:
+        preferred_ip_protocol: "ip4"
+
+# Service monitor for Prometheus
+serviceMonitor:
+  enabled: true
+  namespace: monitoring
+  interval: 5m
+  scrapeTimeout: 30s
+  targets:
+    # API endpoints to monitor
+    - name: voting-app-api
+      url: https://api.voting-app.example.com/health
+      module: http_2xx
+      interval: 5m
+    
+    - name: voting-app-frontend
+      url: https://voting-app.example.com/
+      module: http_2xx
+      interval: 5m
+
+# RBAC
+rbac:
+  create: true
+  resources:
+    - pods
+
+# Security context
+securityContext:
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000

@@ -1,0 +1,51 @@
+# Blackbox Probe Targets Configuration
+# Defines external endpoints to monitor
+
+targets:
+  # API endpoints
+  - name: api-health
+    endpoint: https://api.voting-app.example.com/health
+    module: http_2xx
+    interval: 5m
+    expect_status: 200
+
+  - name: api-readiness
+    endpoint: https://api.voting-app.example.com/api/v1/ready
+    module: http_2xx
+    interval: 5m
+    expect_status: 200
+
+  # Frontend (web UI)
+  - name: frontend-main
+    endpoint: https://voting-app.example.com/
+    module: http_2xx
+    interval: 10m
+    expect_status: 200
+
+  - name: frontend-vote
+    endpoint: https://voting-app.example.com/vote
+    module: http_2xx
+    interval: 10m
+    expect_status: 200
+
+  # Database connectivity (via TCP)
+  - name: database-port
+    endpoint: tcp://voting-app-prod-pg.database.windows.net:5432
+    module: tcp_connect
+    interval: 15m
+
+  # DNS resolution checks
+  - name: api-dns
+    endpoint: api.voting-app.example.com
+    module: dns_lookup
+    interval: 10m
+
+  - name: frontend-dns
+    endpoint: voting-app.example.com
+    module: dns_lookup
+    interval: 10m
+
+# Probe intervals:
+# - Health checks: 5 min
+# - User-facing endpoints: 10 min
+# - Backend connections: 15 min

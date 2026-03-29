@@ -1,0 +1,38 @@
+{{- /*
+  Common Service template
+*/ -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "common-lib.fullname" . }}
+  labels:
+    {{- include "common-lib.labels" . | nindent 4 }}
+
+spec:
+  type: {{ .Values.service.type | default "ClusterIP" }}
+  
+  {{- if .Values.service.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ .Values.service.externalTrafficPolicy }}
+  {{- end }}
+  
+  ports:
+    - port: {{ .Values.service.port | default 80 }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    {{- if .Values.metricsPort }}
+    - port: {{ .Values.service.metricsPort | default 8080 }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    {{- end }}
+
+  selector:
+    {{- include "common-lib.selectorLabels" . | nindent 4 }}
+
+  {{- if .Values.service.sessionAffinity }}
+  sessionAffinity: {{ .Values.service.sessionAffinity }}
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: {{ .Values.service.sessionAffinityTimeout | default 10800 }}
+  {{- end }}

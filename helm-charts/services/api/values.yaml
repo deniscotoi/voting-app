@@ -1,0 +1,106 @@
+# API Service Configuration
+
+replicaCount: 3
+
+image:
+  repository: voting-app-api
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"  # Overridden by CI/CD
+
+containerPort: 8080
+metricsPort: 8080
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  metricsPort: 8080
+
+# Resource requests and limits
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /api/v1/health
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/v1/ready
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  failureThreshold: 3
+
+# Pod annotations for monitoring
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+# Environment variables from ConfigMap
+configMap:
+  data:
+    LOG_LEVEL: "info"
+    ENVIRONMENT: "production"
+    API_PORT: "8080"
+    DATABASE_HOST: "voting-app-prod-pg.database.windows.net"
+    DATABASE_PORT: "5432"
+    DATABASE_NAME: "votingapp"
+
+# Sensitive data (secrets)
+secrets:
+  DATABASE_USER: "pgadmin@voting-app-prod-pg"
+  DATABASE_PASSWORD: "CHANGE_ME"  # Use Azure Key Vault
+
+# Node selection
+nodeSelector: {}
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - api
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  targetRequestsPerSecond: "100"
+
+# Service Account with RBAC
+serviceAccount:
+  create: true
+  name: voting-app-api
+  annotations:
+    azure.workload.identity/client-id: "CLIENT_ID_HERE"  # For pod identity
+
+# Graceful shutdown
+terminationGracePeriodSeconds: 30
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Ingress configuration (handled by main Ingress in ingress-controller)
+ingress:
+  enabled: false

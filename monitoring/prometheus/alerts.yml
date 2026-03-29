@@ -1,0 +1,193 @@
+# Prometheus Alert Rules
+# Rules for alerting on application and infrastructure issues
+
+groups:
+  - name: voting-app.rules
+    interval: 30s
+    rules:
+      # Application Availability Alerts
+      - alert: HighErrorRate
+        expr: |
+          (sum(rate(http_requests_total{status=~"5.."}[5m])) / 
+           sum(rate(http_requests_total[5m]))) > 0.05
+        for: 5m
+        annotations:
+          summary: "High error rate detected (>5%)"
+          description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+          severity: "critical"
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 0.5
+        for: 5m
+        annotations:
+          summary: "High API latency (p95 > 500ms)"
+          description: "p95 latency is {{ $value | humanizeDuration }}"
+          severity: "warning"
+
+      # Pod/Container Alerts
+      - alert: PodCrashLooping
+        expr: |
+          rate(kube_pod_container_status_restarts_total[15m]) > 0.1
+        for: 1m
+        annotations:
+          summary: "Pod is crash looping: {{ $labels.namespace }}/{{ $labels.pod }}"
+          description: "Pod {{ $labels.pod }} in {{ $labels.namespace }} has restarted {{ $value | humanize }} times in the last 15 minutes"
+          severity: "warning"
+
+      - alert: PodNotHealthy
+        expr: |
+          min_over_time(sum by (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"})[15m:1m]) > 0
+        for: 15m
+        annotations:
+          summary: "Pod is not healthy: {{ $labels.namespace }}/{{ $labels.pod }}"
+          description: "Pod {{ $labels.pod }} in {{ $labels.namespace }} has been in a non-running state for more than 15 minutes"
+          severity: "warning"
+
+      # Resource Alerts
+      - alert: NodeMemoryPressure
+        expr: |
+          kube_node_status_condition{condition="MemoryPressure",status="true"} == 1
+        for: 5m
+        annotations:
+          summary: "Node memory pressure: {{ $labels.node }}"
+          description: "Node {{ $labels.node }} has MemoryPressure condition"
+          severity: "warning"
+
+      - alert: NodeDiskPressure
+        expr: |
+          kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+        for: 5m
+        annotations:
+          summary: "Node disk pressure: {{ $labels.node }}"
+          description: "Node {{ $labels.node }} has DiskPressure condition"
+          severity: "critical"
+
+      - alert: ContainerCpuUsageHigh
+        expr: |
+          sum(rate(container_cpu_usage_seconds_total[5m])) by (pod_name) > 0.8
+        for: 5m
+        annotations:
+          summary: "Container high CPU usage: {{ $labels.pod_name }}"
+          description: "Container {{ $labels.pod_name }} CPU usage is {{ $value | humanizePercentage }}"
+          severity: "warning"
+
+      - alert: ContainerMemoryUsageHigh
+        expr: |
+          (sum(container_memory_usage_bytes) by (pod_name) / 
+           sum(container_spec_memory_limit_bytes) by (pod_name)) > 0.85
+        for: 5m
+        annotations:
+          summary: "Container high memory usage: {{ $labels.pod_name }}"
+          description: "Container memory usage is {{ $value | humanizePercentage }} of limit"
+          severity: "warning"
+
+      # Database Alerts
+      - alert: PostgreSQLDown
+        expr: |
+          pg_up == 0
+        for: 1m
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL instance {{ $labels.instance }} is down"
+          severity: "critical"
+
+      - alert: PostgreSQLHighConnections
+        expr: |
+          sum by (instance) (pg_stat_activity_count) > 80
+        for: 5m
+        annotations:
+          summary: "PostgreSQL high connection count: {{ $labels.instance }}"
+          description: "{{ $value }} connections out of max 100"
+          severity: "warning"
+
+      - alert: PostgreSQLSlowQueries
+        expr: |
+          pg_slow_queries > 10
+        for: 5m
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "{{ $value }} slow queries in the last 5 minutes"
+          severity: "warning"
+
+      # Persistent Volume Alerts
+      - alert: PersistentVolumeSpaceLow
+        expr: |
+          (kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes) < 0.15
+        for: 5m
+        annotations:
+          summary: "Low persistent volume space: {{ $labels.persistentvolumeclaim }}"
+          description: "PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full"
+          severity: "warning"
+
+      - alert: PersistentVolumeSpaceCritical
+        expr: |
+          (kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes) < 0.05
+        for: 1m
+        annotations:
+          summary: "Critical persistent volume space: {{ $labels.persistentvolumeclaim }}"
+          description: "PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full"
+          severity: "critical"
+
+      # API Gateway / Ingress Alerts
+      - alert: IngressController5xxErrors
+        expr: |
+          (sum(rate(nginx_ingress_controller_requests{status=~"5.."}[5m])) /
+           sum(rate(nginx_ingress_controller_requests[5m]))) > 0.05
+        for: 5m
+        annotations:
+          summary: "Ingress controller high error rate"
+          description: "Ingress error rate is {{ $value | humanizePercentage }}"
+          severity: "critical"
+
+      - alert: IngressControllerHighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(nginx_ingress_controller_request_duration_seconds_bucket[5m])) by (le, ingress)) > 1
+        for: 5m
+        annotations:
+          summary: "Ingress controller high latency: {{ $labels.ingress }}"
+          description: "p95 request latency is {{ $value | humanizeDuration }}"
+          severity: "warning"
+
+      # Kubernetes Data Plane Alerts
+      - alert: KubernetesStatefulsetReplicasMismatch
+        expr: |
+          kube_statefulset_status_replicas_ready{statefulset!=""} != kube_statefulset_status_replicas{statefulset!=""}
+        for: 10m
+        annotations:
+          summary: "Kubernetes Statefulset replicas mismatch"
+          description: "Statefulset {{ $labels.statefulset }} has not matched the expected number of replicas for more than 10 minutes"
+          severity: "warning"
+
+      - alert: KubernetesPersistentvolumeclaimPending
+        expr: |
+          kube_persistentvolumeclaim_status_phase{phase="Pending"} == 1
+        for: 5m
+        annotations:
+          summary: "Kubernetes PVC pending"
+          description: "PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is pending"
+          severity: "warning"
+
+  - name: slo.rules
+    interval: 30s
+    rules:
+      # SLO: 99.9% availability (43.2 seconds downtime per day)
+      - alert: SLOAvailabilityWarning
+        expr: |
+          (sum(rate(http_requests_total{status!~"5.."}[30m])) /
+           sum(rate(http_requests_total[30m]))) < 0.999
+        for: 5m
+        annotations:
+          summary: "SLO Availability Warning - below 99.9%"
+          description: "Current availability is {{ $value | humanizePercentage }}"
+          severity: "warning"
+
+      - alert: SLOAvailabilityCritical
+        expr: |
+          (sum(rate(http_requests_total{status!~"5.."}[5m])) /
+           sum(rate(http_requests_total[5m]))) < 0.95
+        for: 2m
+        annotations:
+          summary: "SLO Availability Critical - below 95%"
+          description: "Current availability is {{ $value | humanizePercentage }}"
+          severity: "critical"
